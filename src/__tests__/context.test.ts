@@ -94,6 +94,14 @@ describe('APL runtime context', () => {
         expect(runtime.currentContext().indexOrigin).toBe(0);
     });
 
+    it('requires run-scoped changes while async context is active', async () => {
+        await APLRuntime.run({ indexOrigin: 1 }, async () => {
+            expect(() => pushContext({ printPrecision: 2 })).toThrow('Use APLRuntime.run() to scope async context changes');
+            expect(() => popContext()).toThrow('Use APLRuntime.run() to scope async context changes');
+            expect(currentContext().indexOrigin).toBe(1);
+        });
+    });
+
     it('uses index origin when accessing array elements', () => {
         const array = new ArrayType([
             new IntegerType(10),
