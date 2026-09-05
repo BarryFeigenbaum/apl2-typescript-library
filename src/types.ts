@@ -392,34 +392,34 @@ export class ArrayType extends APLType {
     }
 
     format(): string {
-        const formattedElements = this.elements.map(element => element.format());
-        const formatted = formattedElements.join(' ');
         const { printWidth } = APLRuntime.current();
-        if (formatted.length <= printWidth) {
-            return formatted;
-        }
-
-        if (printWidth <= 3) {
-            return printWidth === 0 ? '' : '.'.repeat(printWidth);
-        }
-
-        const limit = printWidth - 3;
         const visible: string[] = [];
         let currentLength = 0;
 
-        for (const element of formattedElements) {
+        for (const element of this.elements) {
+            const formattedElement = element.format();
             const nextLength = currentLength === 0
-                ? element.length
-                : currentLength + 1 + element.length;
-            if (nextLength > limit) {
-                break;
+                ? formattedElement.length
+                : currentLength + 1 + formattedElement.length;
+            if (nextLength <= printWidth) {
+                visible.push(formattedElement);
+                currentLength = nextLength;
+                continue;
             }
 
-            visible.push(element);
-            currentLength = nextLength;
+            if (printWidth <= 3) {
+                return printWidth === 0 ? '' : '.'.repeat(printWidth);
+            }
+
+            const limit = printWidth - 3;
+            while (visible.length > 0 && visible.join(' ').length > limit) {
+                visible.pop();
+            }
+
+            return visible.length === 0 ? '...' : `${visible.join(' ')}...`;
         }
 
-        return visible.length === 0 ? '...' : `${visible.join(' ')}...`;
+        return visible.join(' ');
     }
 
     equals(other: APLType): boolean {

@@ -41,7 +41,7 @@ export class APLRuntime {
         const removed = stack[stack.length - 1] as T;
         if (stack.length <= 1) {
             if (this.storage.getStore()) {
-                this.setStack(this.fallbackStack);
+                this.setStack([this.fallbackStack[0].clone()]);
             }
             return removed;
         }
