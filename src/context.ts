@@ -46,10 +46,10 @@ export class APLRuntime {
 
     popContext(): APLContext {
         const stack = this.getStack();
-        if (stack.length <= 1) {
-            return stack[0] as APLContext;
-        }
         const removed = stack[stack.length - 1] as APLContext;
+        if (stack.length <= 1) {
+            return removed;
+        }
         this.setStack(stack.slice(0, -1));
         return removed;
     }

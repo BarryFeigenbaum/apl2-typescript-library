@@ -79,6 +79,21 @@ describe('APL runtime context', () => {
         expect(currentContext().indexOrigin).toBe(0);
     });
 
+    it('isolates overlapping async context scopes per runtime instance', async () => {
+        const runtime = new APLRuntime();
+        const results = await Promise.all(
+            [1, 0].map(async indexOrigin => {
+                return runtime.run({ indexOrigin }, async () => {
+                    await new Promise(resolve => setTimeout(resolve, indexOrigin === 1 ? 10 : 0));
+                    return runtime.currentContext().indexOrigin;
+                });
+            })
+        );
+
+        expect(results).toEqual([1, 0]);
+        expect(runtime.currentContext().indexOrigin).toBe(0);
+    });
+
     it('uses index origin when accessing array elements', () => {
         const array = new ArrayType([
             new IntegerType(10),
@@ -125,6 +140,21 @@ describe('APL runtime context', () => {
         pushContext({ printWidth: 8 });
         try {
             expect(array.format()).toBe('10 20...');
+        } finally {
+            popContext();
+        }
+    });
+
+    it('does not split formatted elements when truncating arrays', () => {
+        const array = new ArrayType([
+            new IntegerType(10),
+            new IntegerType(200),
+            new IntegerType(3000)
+        ]);
+
+        pushContext({ printWidth: 7 });
+        try {
+            expect(array.format()).toBe('10...');
         } finally {
             popContext();
         }
