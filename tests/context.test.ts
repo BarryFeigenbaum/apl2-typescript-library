@@ -62,11 +62,11 @@ describe('APL runtime context', () => {
     it('uses print precision when formatting floating-point values', () => {
         const value = new FloatingPointType(3.1415926535);
 
-        expect(value.format()).toBe('3.141593');
+        expect(value.format()).toBe('3.14159');
 
         APLRuntime.push({ printPrecision: 2 });
         try {
-            expect(value.format()).toBe('3.14');
+            expect(value.format()).toBe('3.1');
         } finally {
             APLRuntime.pop();
         }
@@ -86,6 +86,21 @@ describe('APL runtime context', () => {
         APLRuntime.push({ printWidth: 8 });
         try {
             expect(array.format()).toBe('10 20...');
+        } finally {
+            APLRuntime.pop();
+        }
+    });
+
+    it('does not split formatted elements when truncating arrays', () => {
+        const array = new ArrayType([
+            new IntegerType(10),
+            new IntegerType(200),
+            new IntegerType(3000)
+        ]);
+
+        APLRuntime.push({ printWidth: 7 });
+        try {
+            expect(array.format()).toBe('10...');
         } finally {
             APLRuntime.pop();
         }

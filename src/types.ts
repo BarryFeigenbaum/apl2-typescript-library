@@ -5,13 +5,18 @@
 import { APLRuntime } from './context';
 
 function formatReal(value: number): string {
-    const precision = Math.max(0, APLRuntime.current().printPrecision);
+    const precision = Math.max(1, APLRuntime.current().printPrecision);
     if (!Number.isFinite(value)) {
         return value.toString();
     }
 
-    const formatted = value.toFixed(precision);
-    return precision === 0 ? formatted : formatted.replace(/\.?0+$/, '');
+    const formatted = value.toPrecision(precision);
+    if (formatted.includes('e')) {
+        return formatted
+            .replace(/(\.\d*?[1-9])0+e/, '$1e')
+            .replace(/\.0+e/, 'e');
+    }
+    return formatted.replace(/\.?0+$/, '');
 }
 
 function numericEquals(left: number, right: number): boolean {
@@ -412,8 +417,15 @@ export class ArrayType extends APLType {
             }
 
             const limit = printWidth - 3;
-            while (visible.length > 0 && visible.join(' ').length > limit) {
-                visible.pop();
+            while (visible.length > 0 && currentLength > limit) {
+                const removed = visible.pop();
+                if (removed === undefined) {
+                    break;
+                }
+                currentLength -= removed.length;
+                if (visible.length > 0) {
+                    currentLength -= 1;
+                }
             }
 
             return visible.length === 0 ? '...' : `${visible.join(' ')}...`;

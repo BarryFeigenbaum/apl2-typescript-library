@@ -21,13 +21,17 @@ export class APLContext {
 
 export class APLRuntime {
     private static readonly storage = new AsyncLocalStorage<APLContext[]>();
-    private static readonly fallbackStack: APLContext[] = [new APLContext()];
+    private static fallbackStack: APLContext[] = [new APLContext()];
 
     static create<T extends APLContext = APLContext>(overrides: Partial<T> = {}): T {
         return new APLContext().clone(overrides);
     }
 
     static push<T extends APLContext = APLContext>(contextOrOverrides: Partial<T> | T = {}): T {
+        if (this.storage.getStore()) {
+            throw new Error('Use APLRuntime.run() to scope async context changes');
+        }
+
         const context = contextOrOverrides instanceof APLContext
             ? contextOrOverrides.clone()
             : this.current<T>().clone(contextOrOverrides);
@@ -37,12 +41,13 @@ export class APLRuntime {
     }
 
     static pop<T extends APLContext = APLContext>(): T {
+        if (this.storage.getStore()) {
+            throw new Error('Use APLRuntime.run() to scope async context changes');
+        }
+
         const stack = this.getStack();
         const removed = stack[stack.length - 1] as T;
         if (stack.length <= 1) {
-            if (this.storage.getStore()) {
-                this.setStack([this.fallbackStack[0].clone()]);
-            }
             return removed;
         }
 
@@ -72,7 +77,8 @@ export class APLRuntime {
     }
 
     private static setStack(stack: APLContext[]): void {
-        if (stack.length <= 1 && !this.storage.getStore()) {
+        if (!this.storage.getStore()) {
+            this.fallbackStack = stack;
             return;
         }
 

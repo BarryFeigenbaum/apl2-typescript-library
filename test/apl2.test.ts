@@ -44,6 +44,7 @@ describe('Scalar Types', () => {
         expect(new IntegerType(42).format()).toBe('42');
         expect(new FloatingPointType(3.5).format()).toBe('3.5');
         expect(new ComplexType(3, -4).format()).toBe('3-4i');
+        expect(new ComplexType(3, 0).format()).toBe('3');
         expect(new StringType('APL').format()).toBe('APL');
     });
 
@@ -132,9 +133,11 @@ describe('Array Operations', () => {
         const left = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(3)]);
         const right = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(3)]);
         const different = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(4)]);
+        const differentShape = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(3)], [3, 1]);
 
         expect(left.format()).toBe('1 2 3');
         expect(left.equals(right)).toBe(true);
         expect(left.equals(different)).toBe(false);
+        expect(left.equals(differentShape)).toBe(false);
     });
 });
