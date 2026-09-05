@@ -37,6 +37,10 @@ export class APLRuntime {
     }
 
     pushContext(contextOrOverrides: Partial<APLContext> | APLContext = {}): APLContext {
+        if (this.getAsyncStorage().getStore() !== undefined) {
+            throw new Error('Use APLRuntime.run() to scope async context changes');
+        }
+
         const context = contextOrOverrides instanceof APLContext
             ? contextOrOverrides.clone()
             : this.currentContext().clone(contextOrOverrides);
@@ -45,6 +49,10 @@ export class APLRuntime {
     }
 
     popContext(): APLContext {
+        if (this.getAsyncStorage().getStore() !== undefined) {
+            throw new Error('Use APLRuntime.run() to scope async context changes');
+        }
+
         const stack = this.getStack();
         const removed = stack[stack.length - 1] as APLContext;
         if (stack.length <= 1) {
