@@ -21,7 +21,7 @@ export class APLContext {
 
 export class APLRuntime {
     private static readonly storage = new AsyncLocalStorage<APLContext[]>();
-    private static fallbackStack: APLContext[] = [new APLContext()];
+    private static readonly fallbackStack: APLContext[] = [new APLContext()];
 
     static create<T extends APLContext = APLContext>(overrides: Partial<T> = {}): T {
         return new APLContext().clone(overrides);
@@ -38,13 +38,14 @@ export class APLRuntime {
 
     static pop<T extends APLContext = APLContext>(): T {
         const stack = this.getStack();
+        const removed = stack[stack.length - 1] as T;
         if (stack.length <= 1) {
-            return stack[0] as T;
+            return removed;
         }
 
         const nextStack = stack.slice(0, -1);
         this.setStack(nextStack);
-        return nextStack[nextStack.length - 1] as T;
+        return removed;
     }
 
     static current<T extends APLContext = APLContext>(): T {
@@ -68,11 +69,10 @@ export class APLRuntime {
     }
 
     private static setStack(stack: APLContext[]): void {
-        if (this.storage.getStore()) {
-            this.storage.enterWith(stack);
+        if (stack.length <= 1 && !this.storage.getStore()) {
             return;
         }
 
-        this.fallbackStack = stack;
+        this.storage.enterWith(stack);
     }
 }

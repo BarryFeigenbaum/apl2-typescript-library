@@ -2,7 +2,6 @@
  * APL2 TypeScript Library Tests
  */
 
-import { describe, it, expect } from '@jest/globals';
 import {
     BooleanType, IntegerType, FloatingPointType, ComplexType,
     StringType, ArrayType

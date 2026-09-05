@@ -75,7 +75,19 @@ export class BooleanType extends Scalar {
     }
 
     equals(other: APLType): boolean {
-        return other instanceof BooleanType && this.value === other.value;
+        if (other instanceof BooleanType) {
+            return this.value === other.value;
+        }
+
+        if (other instanceof ComplexType) {
+            return numericEquals(this.toNumeric(), other.real) && numericEquals(0, other.imaginary);
+        }
+
+        if (other instanceof Scalar && !(other instanceof StringType)) {
+            return numericEquals(this.toNumeric(), other.toNumeric());
+        }
+
+        return false;
     }
 }
 
@@ -195,6 +207,10 @@ export class ComplexType extends Scalar {
     }
 
     format(): string {
+        if (numericEquals(this.imaginary, 0)) {
+            return formatReal(this.real);
+        }
+
         const real = formatReal(this.real);
         const imaginary = formatReal(Math.abs(this.imaginary));
         const sign = this.imaginary < 0 ? '-' : '+';
@@ -373,17 +389,34 @@ export class ArrayType extends APLType {
     }
 
     format(): string {
-        const formatted = this.elements.map(element => element.format()).join(' ');
+        const formattedElements = this.elements.map(element => element.format());
+        const formatted = formattedElements.join(' ');
         const { printWidth } = APLRuntime.current();
         if (formatted.length <= printWidth) {
             return formatted;
         }
 
         if (printWidth <= 3) {
-            return '.'.repeat(Math.max(0, printWidth));
+            return printWidth === 0 ? '' : '.'.repeat(printWidth);
         }
 
-        return `${formatted.slice(0, printWidth - 3)}...`;
+        const limit = printWidth - 3;
+        const visible: string[] = [];
+        let currentLength = 0;
+
+        for (const element of formattedElements) {
+            const nextLength = currentLength === 0
+                ? element.length
+                : currentLength + 1 + element.length;
+            if (nextLength > limit) {
+                break;
+            }
+
+            visible.push(element);
+            currentLength = nextLength;
+        }
+
+        return visible.length === 0 ? '...' : `${visible.join(' ')}...`;
     }
 
     equals(other: APLType): boolean {

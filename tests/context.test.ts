@@ -1,15 +1,13 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
 import { APLContext, APLRuntime } from '../src/context';
 import { ArrayType, FloatingPointType, IntegerType } from '../src/types';
 
 function resetRuntime(): void {
-    let current = APLRuntime.current();
     while (true) {
-        const next = APLRuntime.pop();
-        if (next === current) {
+        const current = APLRuntime.current();
+        APLRuntime.pop();
+        if (APLRuntime.current() === current) {
             return;
         }
-        current = next;
     }
 }
 
