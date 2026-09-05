@@ -2,10 +2,10 @@
  * APL2 Type System for TypeScript
  */
 
-import { APLRuntime } from './context';
+import { currentContext } from './context';
 
 function formatReal(value: number): string {
-    const precision = Math.max(1, APLRuntime.current().printPrecision);
+    const precision = Math.max(1, currentContext().printPrecision);
     if (!Number.isFinite(value)) {
         return value.toString();
     }
@@ -23,7 +23,7 @@ function numericEquals(left: number, right: number): boolean {
     if (left === right) {
         return true;
     }
-    return Math.abs(left - right) <= APLRuntime.current().comparisonTolerance;
+    return Math.abs(left - right) <= currentContext().comparisonTolerance;
 }
 
 export abstract class APLType {
@@ -346,7 +346,7 @@ export class ArrayType extends APLType {
             throw new Error(`Expected ${this.rank} indices, received ${indices.length}`);
         }
 
-        const indexOrigin = APLRuntime.current().indexOrigin;
+        const indexOrigin = currentContext().indexOrigin;
         let flatIndex = 0;
         let multiplier = 1;
         for (let i = this.rank - 1; i >= 0; i--) {
@@ -397,7 +397,7 @@ export class ArrayType extends APLType {
     }
 
     format(): string {
-        const { printWidth } = APLRuntime.current();
+        const { printWidth } = currentContext();
         const visible: string[] = [];
         let currentLength = 0;
 
