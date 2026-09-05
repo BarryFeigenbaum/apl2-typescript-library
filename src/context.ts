@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 export class APLContext {
     constructor(
         public indexOrigin: number = 0,
@@ -18,10 +20,12 @@ export class APLContext {
 
 export class APLRuntime {
     private static readonly stacks = new WeakMap<APLRuntime, APLContext[]>();
+    private static readonly asyncStacks = new WeakMap<APLRuntime, AsyncLocalStorage<APLContext[]>>();
     private static readonly defaultRuntime = new APLRuntime();
 
     constructor(initialContext: APLContext = new APLContext()) {
         APLRuntime.stacks.set(this, [initialContext.clone()]);
+        APLRuntime.asyncStacks.set(this, new AsyncLocalStorage<APLContext[]>());
     }
 
     createContext(overrides: Partial<APLContext> = {}): APLContext {
@@ -36,7 +40,7 @@ export class APLRuntime {
         const context = contextOrOverrides instanceof APLContext
             ? contextOrOverrides.clone()
             : this.currentContext().clone(contextOrOverrides);
-        this.getStack().push(context);
+        this.setStack([...this.getStack(), context]);
         return context;
     }
 
@@ -45,10 +49,17 @@ export class APLRuntime {
         if (stack.length <= 1) {
             return stack[0] as APLContext;
         }
-        return stack.pop() as APLContext;
+        const removed = stack[stack.length - 1] as APLContext;
+        this.setStack(stack.slice(0, -1));
+        return removed;
     }
 
     private getStack(): APLContext[] {
+        const asyncStack = this.getAsyncStorage().getStore();
+        if (asyncStack !== undefined) {
+            return asyncStack;
+        }
+
         const stack = APLRuntime.stacks.get(this);
         if (stack === undefined) {
             const defaultStack = [new APLContext()];
@@ -56,6 +67,36 @@ export class APLRuntime {
             return defaultStack;
         }
         return stack;
+    }
+
+    private setStack(stack: APLContext[]): void {
+        if (this.getAsyncStorage().getStore() !== undefined) {
+            this.getAsyncStorage().enterWith(stack);
+            return;
+        }
+
+        APLRuntime.stacks.set(this, stack);
+    }
+
+    private getAsyncStorage(): AsyncLocalStorage<APLContext[]> {
+        const storage = APLRuntime.asyncStacks.get(this);
+        if (storage === undefined) {
+            const nextStorage = new AsyncLocalStorage<APLContext[]>();
+            APLRuntime.asyncStacks.set(this, nextStorage);
+            return nextStorage;
+        }
+        return storage;
+    }
+
+    run<TResult>(
+        contextOrOverrides: Partial<APLContext> | APLContext,
+        callback: () => TResult
+    ): TResult {
+        const context = contextOrOverrides instanceof APLContext
+            ? contextOrOverrides.clone()
+            : this.currentContext().clone(contextOrOverrides);
+        const stack = [...this.getStack(), context];
+        return this.getAsyncStorage().run(stack, callback);
     }
 
     static createContext(overrides: Partial<APLContext> = {}): APLContext {
@@ -72,6 +113,13 @@ export class APLRuntime {
 
     static popContext(): APLContext {
         return this.defaultRuntime.popContext();
+    }
+
+    static run<TResult>(
+        contextOrOverrides: Partial<APLContext> | APLContext,
+        callback: () => TResult
+    ): TResult {
+        return this.defaultRuntime.run(contextOrOverrides, callback);
     }
 
     static create(overrides: Partial<APLContext> = {}): APLContext {

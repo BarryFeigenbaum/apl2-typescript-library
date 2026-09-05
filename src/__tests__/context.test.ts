@@ -65,6 +65,20 @@ describe('APL runtime context', () => {
         expect(runtimeB.currentContext().printPrecision).toBe(8);
     });
 
+    it('isolates overlapping async context scopes', async () => {
+        const results = await Promise.all(
+            [1, 0].map(async indexOrigin => {
+                return APLRuntime.run({ indexOrigin }, async () => {
+                    await new Promise(resolve => setTimeout(resolve, indexOrigin === 1 ? 10 : 0));
+                    return currentContext().indexOrigin;
+                });
+            })
+        );
+
+        expect(results).toEqual([1, 0]);
+        expect(currentContext().indexOrigin).toBe(0);
+    });
+
     it('uses index origin when accessing array elements', () => {
         const array = new ArrayType([
             new IntegerType(10),
