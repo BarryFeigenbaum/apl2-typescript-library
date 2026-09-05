@@ -15,6 +15,9 @@ function formatReal(value: number): string {
 }
 
 function numericEquals(left: number, right: number): boolean {
+    if (left === right) {
+        return true;
+    }
     return Math.abs(left - right) <= APLRuntime.current().comparisonTolerance;
 }
 
