@@ -311,7 +311,7 @@ export class ArrayType extends APLType {
     getElement(...indices: number[]): APLType {
         const flatIndex = this.toFlatIndex(...indices);
         const element = this.elements[flatIndex];
-        if (!element) {
+        if (element === undefined) {
             throw new Error(`Index ${indices} out of bounds for shape ${this.shape}`);
         }
         return element;
@@ -363,7 +363,7 @@ export class ArrayType extends APLType {
         for (let j = 0; j < cols; j++) {
             for (let i = 0; i < rows; i++) {
                 const element = this.elements[i * cols + j];
-                if (!element) {
+                if (element === undefined) {
                     throw new Error("Transpose encountered an invalid array element");
                 }
                 transposed.push(element);

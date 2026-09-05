@@ -52,6 +52,17 @@ export class APLRuntime {
         return stack[stack.length - 1] as T;
     }
 
+    static run<TResult, T extends APLContext = APLContext>(
+        contextOrOverrides: Partial<T> | T,
+        callback: () => TResult
+    ): TResult {
+        const context = contextOrOverrides instanceof APLContext
+            ? contextOrOverrides.clone()
+            : this.current<T>().clone(contextOrOverrides);
+        const stack = [...this.getStack(), context];
+        return this.storage.run(stack, callback);
+    }
+
     private static getStack(): APLContext[] {
         return this.storage.getStore() ?? this.fallbackStack;
     }
@@ -63,6 +74,5 @@ export class APLRuntime {
         }
 
         this.fallbackStack = stack;
-        this.storage.enterWith(stack);
     }
 }

@@ -31,11 +31,10 @@ describe('APL runtime context', () => {
     it('isolates async context state with AsyncLocalStorage', async () => {
         const results = await Promise.all(
             [1, 0].map(async indexOrigin => {
-                APLRuntime.push({ indexOrigin });
-                await new Promise(resolve => setTimeout(resolve, indexOrigin === 1 ? 10 : 0));
-                const currentIndexOrigin = APLRuntime.current().indexOrigin;
-                APLRuntime.pop();
-                return currentIndexOrigin;
+                return APLRuntime.run({ indexOrigin }, async () => {
+                    await new Promise(resolve => setTimeout(resolve, indexOrigin === 1 ? 10 : 0));
+                    return APLRuntime.current().indexOrigin;
+                });
             })
         );
 
