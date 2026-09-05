@@ -2,11 +2,33 @@
  * APL2 Type System for TypeScript
  */
 
+import { APLRuntime } from './context';
+
+function formatReal(value: number): string {
+    const precision = Math.max(0, APLRuntime.current().printPrecision);
+    if (!Number.isFinite(value)) {
+        return value.toString();
+    }
+
+    const formatted = value.toFixed(precision);
+    return precision === 0 ? formatted : formatted.replace(/\.?0+$/, '');
+}
+
+function numericEquals(left: number, right: number): boolean {
+    return Math.abs(left - right) <= APLRuntime.current().comparisonTolerance;
+}
+
 export abstract class APLType {
     abstract getTypeName(): string;
     abstract deepCopy(): APLType;
     abstract getRank(): number;
     abstract getShape(): number[];
+    abstract format(): string;
+    abstract equals(other: APLType): boolean;
+
+    toString(): string {
+        return this.format();
+    }
 }
 
 export abstract class Scalar extends APLType {
@@ -47,6 +69,14 @@ export class BooleanType extends Scalar {
     toCharacter(): string {
         return this.value ? '1' : '0';
     }
+
+    format(): string {
+        return this.toCharacter();
+    }
+
+    equals(other: APLType): boolean {
+        return other instanceof BooleanType && this.value === other.value;
+    }
 }
 
 export class IntegerType extends Scalar {
@@ -73,6 +103,22 @@ export class IntegerType extends Scalar {
 
     toCharacter(): string {
         return String.fromCharCode(this.value);
+    }
+
+    format(): string {
+        return this.value.toString();
+    }
+
+    equals(other: APLType): boolean {
+        if (other instanceof ComplexType) {
+            return numericEquals(this.value, other.real) && numericEquals(0, other.imaginary);
+        }
+
+        if (other instanceof Scalar && !(other instanceof StringType) && !(other instanceof BooleanType)) {
+            return numericEquals(this.value, other.toNumeric());
+        }
+
+        return false;
     }
 }
 
@@ -102,6 +148,22 @@ export class FloatingPointType extends Scalar {
     toCharacter(): string {
         return String.fromCharCode(Math.floor(this.value));
     }
+
+    format(): string {
+        return formatReal(this.value);
+    }
+
+    equals(other: APLType): boolean {
+        if (other instanceof ComplexType) {
+            return numericEquals(this.value, other.real) && numericEquals(0, other.imaginary);
+        }
+
+        if (other instanceof Scalar && !(other instanceof StringType) && !(other instanceof BooleanType)) {
+            return numericEquals(this.value, other.toNumeric());
+        }
+
+        return false;
+    }
 }
 
 export class ComplexType extends Scalar {
@@ -130,6 +192,25 @@ export class ComplexType extends Scalar {
 
     toCharacter(): string {
         return String.fromCharCode(Math.floor(this.real));
+    }
+
+    format(): string {
+        const real = formatReal(this.real);
+        const imaginary = formatReal(Math.abs(this.imaginary));
+        const sign = this.imaginary < 0 ? '-' : '+';
+        return `${real}${sign}${imaginary}i`;
+    }
+
+    equals(other: APLType): boolean {
+        if (other instanceof ComplexType) {
+            return numericEquals(this.real, other.real) && numericEquals(this.imaginary, other.imaginary);
+        }
+
+        if (other instanceof Scalar && !(other instanceof StringType) && !(other instanceof BooleanType)) {
+            return numericEquals(this.real, other.toNumeric()) && numericEquals(this.imaginary, 0);
+        }
+
+        return false;
     }
 
     add(other: ComplexType): ComplexType {
@@ -179,6 +260,14 @@ export class StringType extends Scalar {
     toCharacter(): string {
         return this.value[0] || '\0';
     }
+
+    format(): string {
+        return this.value;
+    }
+
+    equals(other: APLType): boolean {
+        return other instanceof StringType && this.value === other.value;
+    }
 }
 
 export class ArrayType extends APLType {
@@ -220,22 +309,35 @@ export class ArrayType extends APLType {
     }
 
     getElement(...indices: number[]): APLType {
-        if (indices.length === 1) {
-            return this.elements[indices[0]];
-        }
         const flatIndex = this.toFlatIndex(...indices);
-        return this.elements[flatIndex];
+        const element = this.elements[flatIndex];
+        if (!element) {
+            throw new Error(`Index ${indices} out of bounds for shape ${this.shape}`);
+        }
+        return element;
     }
 
     private toFlatIndex(...indices: number[]): number {
+        if (indices.length !== this.rank) {
+            throw new Error(`Expected ${this.rank} indices, received ${indices.length}`);
+        }
+
+        const indexOrigin = APLRuntime.current().indexOrigin;
         let flatIndex = 0;
         let multiplier = 1;
         for (let i = this.rank - 1; i >= 0; i--) {
-            if (indices[i] < 0 || indices[i] >= this.shape[i]) {
+            const index = indices[i];
+            const dimension = this.shape[i];
+            if (index === undefined || dimension === undefined) {
                 throw new Error(`Index ${indices} out of bounds for shape ${this.shape}`);
             }
-            flatIndex += indices[i] * multiplier;
-            multiplier *= this.shape[i];
+
+            const adjustedIndex = index - indexOrigin;
+            if (adjustedIndex < 0 || adjustedIndex >= dimension) {
+                throw new Error(`Index ${indices} out of bounds for shape ${this.shape}`);
+            }
+            flatIndex += adjustedIndex * multiplier;
+            multiplier *= dimension;
         }
         return flatIndex;
     }
@@ -260,9 +362,36 @@ export class ArrayType extends APLType {
         const transposed: APLType[] = [];
         for (let j = 0; j < cols; j++) {
             for (let i = 0; i < rows; i++) {
-                transposed.push(this.elements[i * cols + j]);
+                const element = this.elements[i * cols + j];
+                if (!element) {
+                    throw new Error("Transpose encountered an invalid array element");
+                }
+                transposed.push(element);
             }
         }
         return new ArrayType(transposed, [cols, rows]);
+    }
+
+    format(): string {
+        const formatted = this.elements.map(element => element.format()).join(' ');
+        const { printWidth } = APLRuntime.current();
+        if (formatted.length <= printWidth) {
+            return formatted;
+        }
+
+        if (printWidth <= 3) {
+            return '.'.repeat(Math.max(0, printWidth));
+        }
+
+        return `${formatted.slice(0, printWidth - 3)}...`;
+    }
+
+    equals(other: APLType): boolean {
+        return other instanceof ArrayType &&
+            this.rank === other.rank &&
+            this.shape.length === other.shape.length &&
+            this.shape.every((dimension, index) => dimension === other.shape[index]) &&
+            this.elements.length === other.elements.length &&
+            this.elements.every((element, index) => element.equals(other.elements[index] as APLType));
     }
 }
