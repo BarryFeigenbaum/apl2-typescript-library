@@ -2,7 +2,6 @@
  * APL2 TypeScript Library Tests
  */
 
-import { describe, it, expect } from '@jest/globals';
 import {
     BooleanType, IntegerType, FloatingPointType, ComplexType,
     StringType, ArrayType
@@ -38,6 +37,22 @@ describe('Scalar Types', () => {
         expect(c.real).toBe(3.0);
         expect(c.imaginary).toBe(4.0);
         expect(c.toNumeric()).toBe(5.0); // magnitude
+    });
+
+    it('should format values using the default context', () => {
+        expect(new BooleanType(true).format()).toBe('1');
+        expect(new IntegerType(42).format()).toBe('42');
+        expect(new FloatingPointType(3.5).format()).toBe('3.5');
+        expect(new ComplexType(3, -4).format()).toBe('3-4i');
+        expect(new ComplexType(3, 0).format()).toBe('3');
+        expect(new StringType('APL').format()).toBe('APL');
+    });
+
+    it('should compare values using the default context', () => {
+        expect(new IntegerType(5).equals(new FloatingPointType(5))).toBe(true);
+        expect(new FloatingPointType(1).equals(new FloatingPointType(1 + 1e-12))).toBe(false);
+        expect(new ComplexType(2, 0).equals(new IntegerType(2))).toBe(true);
+        expect(new StringType('APL').equals(new StringType('APL'))).toBe(true);
     });
 });
 
@@ -112,5 +127,17 @@ describe('Array Operations', () => {
         const reversed = ArrayOperations.reverse(array);
         expect((reversed.elements[0] as IntegerType).value).toBe(3);
         expect((reversed.elements[2] as IntegerType).value).toBe(1);
+    });
+
+    it('should format arrays and compare them element-wise', () => {
+        const left = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(3)]);
+        const right = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(3)]);
+        const different = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(4)]);
+        const differentShape = new ArrayType([new IntegerType(1), new IntegerType(2), new IntegerType(3)], [3, 1]);
+
+        expect(left.format()).toBe('1 2 3');
+        expect(left.equals(right)).toBe(true);
+        expect(left.equals(different)).toBe(false);
+        expect(left.equals(differentShape)).toBe(false);
     });
 });
