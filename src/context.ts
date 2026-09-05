@@ -33,7 +33,8 @@ export class APLRuntime {
     }
 
     currentContext(): APLContext {
-        return this.getStack()[this.getStack().length - 1] as APLContext;
+        const stack = this.getStack();
+        return stack[stack.length - 1] as APLContext;
     }
 
     pushContext(contextOrOverrides: Partial<APLContext> | APLContext = {}): APLContext {
