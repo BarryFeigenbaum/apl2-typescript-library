@@ -8,5 +8,5 @@ module.exports = {
   transform: {
     ...tsJestTransformCfg,
   },
-  roots: ["<rootDir>/test", "<rootDir>/tests"],
+  roots: ["<rootDir>/src/__tests__", "<rootDir>/test", "<rootDir>/tests"],
 };

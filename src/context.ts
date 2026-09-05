@@ -1,5 +1,3 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-
 export class APLContext {
     constructor(
         public indexOrigin: number = 0,
@@ -8,80 +6,103 @@ export class APLContext {
         public comparisonTolerance: number = 1e-15
     ) {}
 
-    clone<T extends APLContext = APLContext>(overrides: Partial<T> = {}): T {
-        const context = new APLContext(
+    clone(overrides: Partial<APLContext> = {}): APLContext {
+        return new APLContext(
             overrides.indexOrigin ?? this.indexOrigin,
             overrides.printWidth ?? this.printWidth,
             overrides.printPrecision ?? this.printPrecision,
             overrides.comparisonTolerance ?? this.comparisonTolerance
         );
-        return context as T;
     }
 }
 
 export class APLRuntime {
-    private static readonly storage = new AsyncLocalStorage<APLContext[]>();
-    private static fallbackStack: APLContext[] = [new APLContext()];
+    private static readonly stacks = new WeakMap<APLRuntime, APLContext[]>();
+    private static readonly defaultRuntime = new APLRuntime();
 
-    static create<T extends APLContext = APLContext>(overrides: Partial<T> = {}): T {
-        return new APLContext().clone(overrides);
+    constructor(initialContext: APLContext = new APLContext()) {
+        APLRuntime.stacks.set(this, [initialContext.clone()]);
     }
 
-    static push<T extends APLContext = APLContext>(contextOrOverrides: Partial<T> | T = {}): T {
-        if (this.storage.getStore()) {
-            throw new Error('Use APLRuntime.run() to scope async context changes');
-        }
+    createContext(overrides: Partial<APLContext> = {}): APLContext {
+        return this.currentContext().clone(overrides);
+    }
 
+    currentContext(): APLContext {
+        return this.getStack()[this.getStack().length - 1] as APLContext;
+    }
+
+    pushContext(contextOrOverrides: Partial<APLContext> | APLContext = {}): APLContext {
         const context = contextOrOverrides instanceof APLContext
             ? contextOrOverrides.clone()
-            : this.current<T>().clone(contextOrOverrides);
-        const stack = [...this.getStack(), context];
-        this.setStack(stack);
-        return context as T;
+            : this.currentContext().clone(contextOrOverrides);
+        this.getStack().push(context);
+        return context;
     }
 
-    static pop<T extends APLContext = APLContext>(): T {
-        if (this.storage.getStore()) {
-            throw new Error('Use APLRuntime.run() to scope async context changes');
-        }
-
+    popContext(): APLContext {
         const stack = this.getStack();
-        const removed = stack[stack.length - 1] as T;
         if (stack.length <= 1) {
-            return removed;
+            return stack[0] as APLContext;
         }
-
-        const nextStack = stack.slice(0, -1);
-        this.setStack(nextStack);
-        return removed;
+        return stack.pop() as APLContext;
     }
 
-    static current<T extends APLContext = APLContext>(): T {
-        const stack = this.getStack();
-        return stack[stack.length - 1] as T;
-    }
-
-    static run<TResult, T extends APLContext = APLContext>(
-        contextOrOverrides: Partial<T> | T,
-        callback: () => TResult
-    ): TResult {
-        const context = contextOrOverrides instanceof APLContext
-            ? contextOrOverrides.clone()
-            : this.current<T>().clone(contextOrOverrides);
-        const stack = [...this.getStack(), context];
-        return this.storage.run(stack, callback);
-    }
-
-    private static getStack(): APLContext[] {
-        return this.storage.getStore() ?? this.fallbackStack;
-    }
-
-    private static setStack(stack: APLContext[]): void {
-        if (!this.storage.getStore()) {
-            this.fallbackStack = stack;
-            return;
+    private getStack(): APLContext[] {
+        const stack = APLRuntime.stacks.get(this);
+        if (stack === undefined) {
+            const defaultStack = [new APLContext()];
+            APLRuntime.stacks.set(this, defaultStack);
+            return defaultStack;
         }
-
-        this.storage.enterWith(stack);
+        return stack;
     }
+
+    static createContext(overrides: Partial<APLContext> = {}): APLContext {
+        return this.defaultRuntime.createContext(overrides);
+    }
+
+    static currentContext(): APLContext {
+        return this.defaultRuntime.currentContext();
+    }
+
+    static pushContext(contextOrOverrides: Partial<APLContext> | APLContext = {}): APLContext {
+        return this.defaultRuntime.pushContext(contextOrOverrides);
+    }
+
+    static popContext(): APLContext {
+        return this.defaultRuntime.popContext();
+    }
+
+    static create(overrides: Partial<APLContext> = {}): APLContext {
+        return this.createContext(overrides);
+    }
+
+    static current(): APLContext {
+        return this.currentContext();
+    }
+
+    static push(contextOrOverrides: Partial<APLContext> | APLContext = {}): APLContext {
+        return this.pushContext(contextOrOverrides);
+    }
+
+    static pop(): APLContext {
+        return this.popContext();
+    }
+}
+
+export function createContext(overrides: Partial<APLContext> = {}): APLContext {
+    return APLRuntime.createContext(overrides);
+}
+
+export function currentContext(): APLContext {
+    return APLRuntime.currentContext();
+}
+
+export function pushContext(contextOrOverrides: Partial<APLContext> | APLContext = {}): APLContext {
+    return APLRuntime.pushContext(contextOrOverrides);
+}
+
+export function popContext(): APLContext {
+    return APLRuntime.popContext();
 }
